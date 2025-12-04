@@ -1,8 +1,16 @@
+import sys
+import os
+from pathlib import Path
+
+# Đảm bảo PYTHONPATH đúng khi chạy từ aaPanel
+PROJECT_DIR = Path(__file__).parent.parent.absolute()
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
+os.chdir(PROJECT_DIR)
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-import os
 import uuid
-from pathlib import Path
 
 from app.ocr_service import OCRService
 from app.models import OCRResponse

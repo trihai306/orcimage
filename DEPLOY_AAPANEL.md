@@ -1,68 +1,84 @@
 # Hướng dẫn Deploy OCR Server lên aaPanel
 
-## Yêu cầu hệ thống
+Hướng dẫn chi tiết để deploy ứng dụng OCR ID Card Server lên server sử dụng aaPanel.
 
-- Server Linux (Ubuntu/CentOS/Debian)
-- aaPanel đã được cài đặt
-- Python 3.8+ trên server
-- Domain hoặc IP public (tùy chọn)
+## Yêu cầu
 
-## Bước 1: Chuẩn bị trên aaPanel
+- Server Linux (Ubuntu/CentOS) với aaPanel đã cài đặt
+- Domain đã trỏ về IP server (hoặc sử dụng IP trực tiếp)
+- Quyền root hoặc sudo
+- Tối thiểu 2GB RAM (khuyến nghị 4GB+)
+- 10GB+ dung lượng ổ cứng (để cài đặt Python, dependencies và models)
 
-### 1.1. Tạo Website trong aaPanel
+## Bước 1: Chuẩn bị môi trường trên aaPanel
+
+### 1.1. Cài đặt Python và các công cụ cần thiết
 
 1. Đăng nhập vào aaPanel
-2. Vào **Website** → **Add Site**
-3. Nhập domain hoặc IP của bạn
-4. Chọn **Python Project** (nếu có) hoặc **PHP** (sẽ đổi sau)
-5. Click **Submit**
+2. Vào **App Store** → Tìm và cài đặt:
+   - **Python Project Manager** (hoặc Python 3.x)
+   - **PM2 Manager** (để quản lý process)
+   - **Nginx** (nếu chưa có)
 
-### 1.2. Cài đặt Python Manager (nếu chưa có)
+### 1.2. Tạo Website mới
 
-1. Vào **App Store** trong aaPanel
-2. Tìm và cài đặt **Python Project Manager** hoặc **PM2 Manager**
-3. Hoặc sử dụng **Terminal** có sẵn trong aaPanel
+1. Vào **Website** → **Add Site**
+2. Điền thông tin:
+   - **Domain**: `your-domain.com` (hoặc IP của server)
+   - **Root Directory**: `/www/wwwroot/your-domain.com`
+   - **PHP Version**: Không cần (chọn None hoặc không chọn)
+3. Click **Submit**
 
 ## Bước 2: Upload code lên server
 
-### 2.1. Cách 1: Upload qua File Manager
+### 2.1. Upload files qua File Manager
 
-1. Vào **File** → **File Manager** trong aaPanel
-2. Navigate đến thư mục website vừa tạo (thường là `/www/wwwroot/your-domain.com`)
-3. Upload toàn bộ code dự án vào thư mục này:
-   - `app/` folder
-   - `requirements.txt`
-   - `README.md`
-
-### 2.2. Cách 2: Upload qua Git (Khuyến nghị)
+1. Vào **File** trong aaPanel
+2. Điều hướng đến `/www/wwwroot/your-domain.com`
+3. Upload tất cả files của dự án (hoặc clone từ Git):
 
 ```bash
-# SSH vào server
-ssh root@your-server-ip
-
-# Vào thư mục website
+# Nếu có SSH access, có thể clone trực tiếp:
 cd /www/wwwroot/your-domain.com
-
-# Clone repository (nếu có)
-git clone your-repo-url .
-
-# Hoặc tạo thư mục mới
-mkdir ocr-server
-cd ocr-server
-# Upload files vào đây
+git clone <your-repo-url> .
 ```
 
-## Bước 3: Cài đặt Python và Dependencies
+### 2.2. Cấu trúc thư mục sau khi upload
+
+```
+/www/wwwroot/your-domain.com/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── models.py
+│   └── ocr_service.py
+├── uploads/
+├── requirements.txt
+├── start.sh
+├── ecosystem.config.js
+└── nginx.conf.example
+```
+
+## Bước 3: Cài đặt Python và Virtual Environment
 
 ### 3.1. Kiểm tra Python version
 
+Mở **Terminal** trong aaPanel hoặc SSH vào server:
+
 ```bash
 python3 --version
-# Nếu chưa có, cài đặt:
-# Ubuntu/Debian:
-apt update && apt install python3 python3-pip python3-venv -y
+# Hoặc
+python --version
+```
 
-# CentOS:
+Cần Python 3.8 trở lên. Nếu chưa có, cài đặt:
+
+```bash
+# Ubuntu/Debian
+apt update
+apt install python3 python3-pip python3-venv -y
+
+# CentOS
 yum install python3 python3-pip -y
 ```
 
@@ -71,100 +87,93 @@ yum install python3 python3-pip -y
 ```bash
 cd /www/wwwroot/your-domain.com
 python3 -m venv venv
-source venv/bin/activate
 ```
 
-### 3.3. Cài đặt Dependencies
+### 3.3. Activate virtual environment và cài đặt dependencies
 
 ```bash
+source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**Lưu ý:** EasyOCR sẽ tự động tải model lần đầu, có thể mất vài phút.
+**Lưu ý quan trọng:**
+- Lần đầu cài đặt EasyOCR sẽ tự động tải các model (có thể mất 5-10 phút)
+- Quá trình này cần kết nối internet ổn định
+- Dung lượng model khoảng 1-2GB
 
 ## Bước 4: Cấu hình PM2 để chạy ứng dụng
 
-### 4.1. Tạo file start script
-
-Tạo file `start.sh` trong thư mục dự án:
+### 4.1. Cài đặt PM2 (nếu chưa có)
 
 ```bash
-#!/bin/bash
-cd /www/wwwroot/your-domain.com
-source venv/bin/activate
-python -m app.main
-```
-
-Cấp quyền thực thi:
-```bash
-chmod +x start.sh
-```
-
-### 4.2. Sử dụng PM2 Manager trong aaPanel
-
-1. Vào **App Store** → Cài **PM2 Manager** (nếu chưa có)
-2. Vào **PM2 Manager**
-3. Click **Add** → **Add Node App**
-4. Điền thông tin:
-   - **App Name:** `ocr-server`
-   - **Run Path:** `/www/wwwroot/your-domain.com`
-   - **Startup File:** `app/main.py`
-   - **Interpreter:** `/www/wwwroot/your-domain.com/venv/bin/python`
-   - **Port:** `8000` (hoặc port khác)
-   - **Options:** `-m app.main`
-
-### 4.3. Hoặc sử dụng PM2 qua Terminal
-
-```bash
-# Cài đặt PM2 global
 npm install -g pm2
+```
 
-# Vào thư mục dự án
+### 4.2. Chỉnh sửa file ecosystem.config.js
+
+Mở file `ecosystem.config.js` và thay đổi đường dẫn:
+
+```bash
 cd /www/wwwroot/your-domain.com
+nano ecosystem.config.js
+```
 
-# Tạo file ecosystem.config.js
-cat > ecosystem.config.js << EOF
-module.exports = {
-  apps: [{
-    name: 'ocr-server',
-    script: 'venv/bin/python',
-    args: '-m app.main',
-    cwd: '/www/wwwroot/your-domain.com',
-    interpreter: 'none',
-    env: {
-      PORT: 8000
-    }
-  }]
-}
-EOF
+Thay đổi dòng:
+```javascript
+cwd: '/www/wwwroot/your-domain.com', // Thay your-domain.com bằng domain/IP của bạn
+```
 
-# Start với PM2
+### 4.3. Tạo thư mục logs (nếu chưa có)
+
+```bash
+mkdir -p /www/wwwroot/your-domain.com/logs
+```
+
+### 4.4. Khởi động ứng dụng với PM2
+
+```bash
+cd /www/wwwroot/your-domain.com
 pm2 start ecosystem.config.js
 pm2 save
-pm2 startup
+pm2 startup  # Chạy lệnh này và làm theo hướng dẫn để tự động khởi động khi server reboot
 ```
 
-## Bước 5: Cấu hình Nginx Reverse Proxy
+### 4.5. Kiểm tra trạng thái
 
-### 5.1. Tạo Nginx config
+```bash
+pm2 status
+pm2 logs ocr-server
+```
 
-1. Vào **Website** → Chọn website của bạn → **Settings**
-2. Vào tab **Configuration**
-3. Thêm hoặc sửa config như sau:
+Bạn sẽ thấy log của ứng dụng. Nếu có lỗi, kiểm tra và sửa.
+
+## Bước 5: Cấu hình Nginx
+
+### 5.1. Cấu hình Nginx trong aaPanel
+
+1. Vào **Website** → Click vào domain của bạn
+2. Chọn **Settings** → **Configuration**
+3. Xóa nội dung cũ và paste cấu hình sau:
 
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name your-domain.com www.your-domain.com;  # Thay đổi domain của bạn
     
     # Logs
     access_log /www/wwwlogs/your-domain.com.log;
     error_log /www/wwwlogs/your-domain.com.error.log;
     
-    # Upload size limit (cho ảnh lớn)
+    # Upload size limit (tăng nếu cần xử lý ảnh lớn)
     client_max_body_size 10M;
     
+    # Timeout settings (tăng cho OCR xử lý lâu)
+    proxy_connect_timeout 300s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+    
+    # Main location - proxy to FastAPI
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
@@ -176,31 +185,47 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        
-        # Timeouts
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 300s;
-        proxy_read_timeout 300s;
+    }
+    
+    # Health check endpoint (tùy chọn)
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        access_log off;
     }
     
     # Static files (nếu có)
     location /static {
         alias /www/wwwroot/your-domain.com/static;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Deny access to sensitive files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
     }
 }
 ```
 
+**Nhớ thay `your-domain.com` bằng domain/IP thực tế của bạn!**
+
 4. Click **Save** và **Reload** Nginx
 
-### 5.2. Hoặc sử dụng aaPanel Website Settings
+### 5.2. Kiểm tra cấu hình Nginx
 
-1. Vào **Website** → Chọn website → **Settings**
-2. Vào **Reverse Proxy**
-3. Thêm reverse proxy:
-   - **Proxy Name:** `ocr-api`
-   - **Target URL:** `http://127.0.0.1:8000`
-   - **Send Domain:** Bật
-   - **WebSocket:** Tắt (hoặc bật nếu cần)
+```bash
+nginx -t
+```
+
+Nếu có lỗi, sửa lại. Sau đó reload:
+
+```bash
+# Trong aaPanel: Website → Settings → Reload
+# Hoặc qua terminal:
+systemctl reload nginx
+```
 
 ## Bước 6: Cấu hình Firewall
 
@@ -208,50 +233,142 @@ server {
 
 1. Vào **Security** → **Firewall**
 2. Thêm rule:
-   - **Port:** `8000` (hoặc port bạn chọn)
-   - **Protocol:** TCP
-   - **Action:** Allow
+   - **Port**: `80` (HTTP)
+   - **Port**: `443` (HTTPS - nếu dùng SSL)
+   - **Port**: `8000` (chỉ mở nếu cần truy cập trực tiếp, thường không cần vì đã dùng Nginx proxy)
 
-### 6.2. Hoặc sử dụng Terminal
+### 6.2. Hoặc dùng lệnh (nếu dùng ufw)
 
 ```bash
-# Ubuntu/Debian
-ufw allow 8000/tcp
-
-# CentOS
-firewall-cmd --permanent --add-port=8000/tcp
-firewall-cmd --reload
+ufw allow 80/tcp
+ufw allow 443/tcp
 ```
 
-## Bước 7: Cấu hình SSL (HTTPS) - Tùy chọn
+## Bước 7: Kiểm tra ứng dụng
 
-1. Vào **Website** → Chọn website → **Settings**
-2. Vào tab **SSL**
-3. Chọn **Let's Encrypt** (miễn phí)
-4. Nhập email và click **Apply**
-5. Bật **Force HTTPS**
+### 7.1. Kiểm tra qua browser
 
-## Bước 8: Kiểm tra và Test
+Mở trình duyệt và truy cập:
+- `http://your-domain.com/` - Xem thông tin server
+- `http://your-domain.com/health` - Kiểm tra health check
 
-### 8.1. Kiểm tra PM2 status
+### 7.2. Test API qua curl
 
 ```bash
-pm2 status
-pm2 logs ocr-server
-```
-
-### 8.2. Test API
-
-```bash
-# Test health endpoint
+curl http://your-domain.com/
 curl http://your-domain.com/health
-
-# Test OCR endpoint
-curl -X POST "http://your-domain.com/ocr" \
-  -F "file=@test-image.jpg"
 ```
 
-### 8.3. Kiểm tra logs
+### 7.3. Test upload ảnh
+
+```bash
+curl -X POST "http://your-domain.com/ocr" \
+  -F "file=@/path/to/test-image.jpg"
+```
+
+## Bước 8: Cài đặt SSL (Tùy chọn nhưng khuyến nghị)
+
+### 8.1. Cài SSL trong aaPanel
+
+1. Vào **Website** → Click domain → **SSL**
+2. Chọn **Let's Encrypt** (miễn phí)
+3. Điền email và click **Apply**
+4. Bật **Force HTTPS**
+
+### 8.2. Cập nhật Nginx config cho HTTPS
+
+Sau khi cài SSL, cấu hình sẽ tự động thêm HTTPS. Nếu cần chỉnh sửa, thêm vào config:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com www.your-domain.com;
+    
+    ssl_certificate /www/server/panel/vhost/cert/your-domain.com/fullchain.pem;
+    ssl_certificate_key /www/server/panel/vhost/cert/your-domain.com/privkey.pem;
+    
+    # ... (copy các config từ server block HTTP ở trên)
+}
+```
+
+## Bước 9: Tối ưu hóa và bảo mật
+
+### 9.1. Cấu hình PM2 auto-restart
+
+PM2 đã được cấu hình auto-restart trong `ecosystem.config.js`. Kiểm tra:
+
+```bash
+pm2 info ocr-server
+```
+
+### 9.2. Giới hạn memory (nếu cần)
+
+Trong `ecosystem.config.js`, có thể điều chỉnh:
+```javascript
+max_memory_restart: '1G',  // Tăng/giảm tùy server
+```
+
+### 9.3. Tối ưu số workers
+
+Trong file `start.sh`, có thể điều chỉnh số workers:
+```bash
+--workers 1  # Server nhỏ: 1 worker
+--workers 2  # Server vừa: 2 workers
+--workers 4  # Server lớn: 4 workers
+```
+
+### 9.4. Bảo mật
+
+- Đảm bảo file `.env` (nếu có) không được public
+- Kiểm tra quyền file: `chmod 600 .env`
+- Không commit thông tin nhạy cảm lên Git
+
+## Troubleshooting
+
+### Lỗi: Port 8000 đã được sử dụng
+
+```bash
+# Kiểm tra process đang dùng port 8000
+lsof -i :8000
+# Hoặc
+netstat -tulpn | grep 8000
+
+# Kill process nếu cần
+kill -9 <PID>
+```
+
+### Lỗi: PM2 không khởi động được
+
+1. Kiểm tra log: `pm2 logs ocr-server`
+2. Kiểm tra Python path trong `ecosystem.config.js`
+3. Đảm bảo virtual environment đã được activate đúng cách
+
+### Lỗi: EasyOCR không tải được model
+
+1. Kiểm tra kết nối internet
+2. Kiểm tra dung lượng ổ cứng: `df -h`
+3. Thử tải model thủ công:
+```bash
+python3 -c "import easyocr; reader = easyocr.Reader(['vi', 'en'])"
+```
+
+### Lỗi: Nginx 502 Bad Gateway
+
+1. Kiểm tra ứng dụng có đang chạy: `pm2 status`
+2. Kiểm tra port 8000: `curl http://127.0.0.1:8000/health`
+3. Kiểm tra log Nginx: `/www/wwwlogs/your-domain.com.error.log`
+
+### Lỗi: Permission denied
+
+```bash
+# Cấp quyền cho thư mục uploads
+chmod 755 /www/wwwroot/your-domain.com/uploads
+chown -R www:www /www/wwwroot/your-domain.com/uploads
+```
+
+## Quản lý ứng dụng
+
+### Xem logs
 
 ```bash
 # PM2 logs
@@ -259,146 +376,55 @@ pm2 logs ocr-server
 
 # Nginx logs
 tail -f /www/wwwlogs/your-domain.com.log
-tail -f /www/www/wwwlogs/your-domain.com.error.log
-
-# Application logs (nếu có)
-tail -f /www/wwwroot/your-domain.com/logs/app.log
+tail -f /www/wwwlogs/your-domain.com.error.log
 ```
 
-## Bước 9: Tối ưu hóa
-
-### 9.1. Tăng workers cho Uvicorn
-
-Sửa file `app/main.py` hoặc tạo file `start.sh`:
+### Restart ứng dụng
 
 ```bash
-#!/bin/bash
+pm2 restart ocr-server
+```
+
+### Stop/Start ứng dụng
+
+```bash
+pm2 stop ocr-server
+pm2 start ocr-server
+```
+
+### Xem thông tin ứng dụng
+
+```bash
+pm2 info ocr-server
+pm2 monit
+```
+
+## Cập nhật code mới
+
+1. Backup code hiện tại (khuyến nghị)
+2. Upload code mới hoặc pull từ Git
+3. Cài đặt dependencies mới (nếu có):
+```bash
 cd /www/wwwroot/your-domain.com
 source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+pip install -r requirements.txt
 ```
-
-### 9.2. Cấu hình PM2 với nhiều instances
-
-Sửa `ecosystem.config.js`:
-
-```javascript
-module.exports = {
-  apps: [{
-    name: 'ocr-server',
-    script: 'venv/bin/uvicorn',
-    args: 'app.main:app --host 0.0.0.0 --port 8000 --workers 2',
-    instances: 2,
-    exec_mode: 'cluster',
-    cwd: '/www/wwwroot/your-domain.com',
-    env: {
-      PORT: 8000
-    }
-  }]
-}
-```
-
-### 9.3. Tự động restart khi server reboot
-
+4. Restart ứng dụng:
 ```bash
-pm2 save
-pm2 startup
-# Chạy lệnh được hiển thị để cấu hình startup
-```
-
-## Troubleshooting
-
-### Lỗi: Port đã được sử dụng
-
-```bash
-# Tìm process đang dùng port 8000
-lsof -i :8000
-# Hoặc
-netstat -tulpn | grep 8000
-
-# Kill process
-kill -9 <PID>
-```
-
-### Lỗi: Permission denied
-
-```bash
-# Cấp quyền cho thư mục
-chown -R www:www /www/wwwroot/your-domain.com
-chmod -R 755 /www/wwwroot/your-domain.com
-```
-
-### Lỗi: EasyOCR không tải được model
-
-```bash
-# Kiểm tra kết nối internet
-ping google.com
-
-# Tải model thủ công (nếu cần)
-# EasyOCR sẽ tự động tải khi chạy lần đầu
-```
-
-### Lỗi: Memory không đủ
-
-```bash
-# Kiểm tra memory
-free -h
-
-# Giảm số workers nếu cần
-# Sửa workers trong start script từ 4 xuống 2 hoặc 1
-```
-
-## Cấu trúc thư mục trên server
-
-```
-/www/wwwroot/your-domain.com/
-├── app/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── ocr_service.py
-│   └── models.py
-├── uploads/          # Tự động tạo
-├── venv/             # Virtual environment
-├── requirements.txt
-├── ecosystem.config.js
-├── start.sh
-└── README.md
-```
-
-## Lệnh hữu ích
-
-```bash
-# Restart PM2 app
 pm2 restart ocr-server
-
-# Stop PM2 app
-pm2 stop ocr-server
-
-# Start PM2 app
-pm2 start ocr-server
-
-# Xem logs realtime
-pm2 logs ocr-server --lines 100
-
-# Reload Nginx
-nginx -s reload
-# Hoặc trong aaPanel: Website → Settings → Reload
-
-# Kiểm tra port
-netstat -tulpn | grep 8000
 ```
 
-## Liên kết hữu ích
+## Kết luận
 
-- aaPanel Documentation: https://doc.aapanel.com/
-- PM2 Documentation: https://pm2.keymetrics.io/
-- FastAPI Deployment: https://fastapi.tiangolo.com/deployment/
+Sau khi hoàn thành các bước trên, ứng dụng OCR Server của bạn đã sẵn sàng chạy trên production. 
 
-## Hỗ trợ
+**Các endpoint chính:**
+- `GET /` - Thông tin server
+- `GET /health` - Health check
+- `POST /ocr` - Upload ảnh và trích xuất text
 
-Nếu gặp vấn đề, kiểm tra:
-1. PM2 logs: `pm2 logs ocr-server`
-2. Nginx error logs: `/www/wwwlogs/your-domain.com.error.log`
-3. Server resources: `htop` hoặc `free -h`
-4. Network connectivity: `curl http://localhost:8000/health`
+**Lưu ý:**
+- Lần đầu chạy có thể chậm do EasyOCR tải model
+- Đảm bảo server có đủ RAM (tối thiểu 2GB, khuyến nghị 4GB+)
+- Theo dõi logs thường xuyên để phát hiện lỗi sớm
 
