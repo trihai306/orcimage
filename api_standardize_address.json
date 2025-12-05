@@ -1,0 +1,73 @@
+{
+  "api_name": "Chuẩn hóa địa chỉ Việt Nam",
+  "description": "API chuyển đổi địa chỉ từ format cũ (63 tỉnh) sang format mới (34 tỉnh) sau sáp nhập hành chính 2025",
+  "endpoint": "POST http://localhost:8000/standardize-address",
+  "content_type": "application/json",
+  
+  "request_format": {
+    "address": "string (required) - Địa chỉ cần chuẩn hóa",
+    "short_name": "boolean (optional, default: true) - Sử dụng tên ngắn hay đầy đủ"
+  },
+  
+  "request_examples": [
+    {
+      "description": "Ví dụ 1: Địa chỉ với short_name=true (mặc định)",
+      "curl": "curl -X POST \"http://localhost:8000/standardize-address\" -H \"Content-Type: application/json\" -d '{\"address\": \"Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh\"}'",
+      "python": "import requests\nresponse = requests.post('http://localhost:8000/standardize-address', json={'address': 'Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh'})\nprint(response.json())",
+      "javascript": "fetch('http://localhost:8000/standardize-address', {\n  method: 'POST',\n  headers: {'Content-Type': 'application/json'},\n  body: JSON.stringify({address: 'Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh'})\n}).then(r => r.json()).then(console.log)"
+    },
+    {
+      "description": "Ví dụ 2: Địa chỉ với short_name=false (tên đầy đủ)",
+      "curl": "curl -X POST \"http://localhost:8000/standardize-address\" -H \"Content-Type: application/json\" -d '{\"address\": \"Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh\", \"short_name\": false}'",
+      "python": "import requests\nresponse = requests.post('http://localhost:8000/standardize-address', json={'address': 'Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh', 'short_name': False})\nprint(response.json())",
+      "javascript": "fetch('http://localhost:8000/standardize-address', {\n  method: 'POST',\n  headers: {'Content-Type': 'application/json'},\n  body: JSON.stringify({address: 'Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh', short_name: false})\n}).then(r => r.json()).then(console.log)"
+    },
+    {
+      "description": "Ví dụ 3: Địa chỉ khác",
+      "curl": "curl -X POST \"http://localhost:8000/standardize-address\" -H \"Content-Type: application/json\" -d '{\"address\": \"Đông Tiến, Yên Phong, Bắc Ninh\"}'",
+      "python": "import requests\nresponse = requests.post('http://localhost:8000/standardize-address', json={'address': 'Đông Tiến, Yên Phong, Bắc Ninh'})\nprint(response.json())"
+    }
+  ],
+  
+  "response_success": {
+    "success": true,
+    "original_address": "Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh",
+    "standardized_address": "Mẫn Xá, Yên Phong, Bắc Ninh",
+    "province": "Bắc Ninh",
+    "district": null,
+    "ward": "Yên Phong",
+    "street": "Mẫn Xá",
+    "error": null
+  },
+  
+  "response_error": {
+    "success": false,
+    "original_address": "",
+    "standardized_address": null,
+    "province": null,
+    "district": null,
+    "ward": null,
+    "street": null,
+    "error": "Địa chỉ không được để trống"
+  },
+  
+  "response_fields": {
+    "success": "boolean - Trạng thái thành công/thất bại",
+    "original_address": "string - Địa chỉ gốc đã gửi",
+    "standardized_address": "string - Địa chỉ đã được chuẩn hóa",
+    "province": "string|null - Tỉnh/Thành phố (đã chuẩn hóa)",
+    "district": "string|null - Quận/Huyện (nếu có)",
+    "ward": "string|null - Phường/Xã (đã chuẩn hóa)",
+    "street": "string|null - Đường/Thôn/Xóm (nếu có)",
+    "error": "string|null - Thông báo lỗi nếu có"
+  },
+  
+  "notes": [
+    "API này sử dụng thư viện vietnamadminunits để chuyển đổi địa chỉ",
+    "Địa chỉ sẽ được convert từ format 63 tỉnh sang format 34 tỉnh (sau sáp nhập 2025)",
+    "Một số địa chỉ cũ có thể bị loại bỏ phần không cần thiết (ví dụ: 'Long Châu' sẽ bị loại bỏ)",
+    "short_name=true: Sử dụng tên ngắn (ví dụ: 'Bắc Ninh', 'Yên Phong')",
+    "short_name=false: Sử dụng tên đầy đủ (ví dụ: 'Tỉnh Bắc Ninh', 'Xã Yên Phong')"
+  ]
+}
+

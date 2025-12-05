@@ -1,0 +1,37 @@
+{
+  "description": "Demo request cho API chuẩn hóa địa chỉ",
+  "endpoint": "POST http://localhost:8000/standardize-address",
+  "content_type": "application/json",
+  "request_example": {
+    "address": "Đông Tiến, Yên Phong, Bắc Ninh",
+    "convert_mode": "CONVERT_2025",
+    "short_name": true
+  },
+  "request_example_2": {
+    "address": "Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh",
+    "short_name": true
+  },
+  "response_success": {
+    "success": true,
+    "original_address": "Đông Tiến, Yên Phong, Bắc Ninh",
+    "standardized_address": "Đông Tiến, Yên Phong, Bắc Ninh",
+    "province": "Bắc Ninh",
+    "district": null,
+    "ward": "Yên Phong",
+    "street": "Đông Tiến",
+    "error": null
+  },
+  "response_error": {
+    "success": false,
+    "original_address": "",
+    "standardized_address": null,
+    "province": null,
+    "district": null,
+    "ward": null,
+    "street": null,
+    "error": "Địa chỉ không được để trống"
+  },
+  "curl_example": "curl -X POST \"http://localhost:8000/standardize-address\" -H \"Content-Type: application/json\" -d '{\"address\": \"Đông Tiến, Yên Phong, Bắc Ninh\"}'",
+  "python_example": "Xem file demo_standardize_address.py"
+}
+

@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse
 import uuid
 
 from app.ocr_service import OCRService
-from app.models import OCRResponse
+from app.models import OCRResponse, StandardizeAddressRequest, StandardizeAddressResponse
+from vietnamadminunits import convert_address
 
 app = FastAPI(
     title="OCR ID Card Server",
@@ -39,6 +40,7 @@ async def root():
         "message": "OCR ID Card Server đang chạy",
         "endpoints": {
             "ocr": "/ocr (POST) - Upload ảnh để trích xuất text",
+            "standardize_address": "/standardize-address (POST) - Chuẩn hóa địa chỉ từ format cũ (63 tỉnh) sang format mới (34 tỉnh)",
             "health": "/health (GET) - Kiểm tra trạng thái server"
         }
     }
@@ -123,6 +125,100 @@ async def ocr_endpoint(file: UploadFile = File(...)):
         # Xóa file tạm sau khi xử lý
         if temp_file_path.exists():
             os.remove(temp_file_path)
+
+
+@app.post("/standardize-address", response_model=StandardizeAddressResponse)
+async def standardize_address_endpoint(request: StandardizeAddressRequest):
+    """
+    Endpoint chuẩn hóa địa chỉ Việt Nam từ format cũ (63 tỉnh) sang format mới (34 tỉnh)
+    
+    Sau khi sáp nhập hành chính tháng 7/2025, Việt Nam đã giảm từ 63 tỉnh/thành phố xuống 34.
+    API này giúp chuyển đổi địa chỉ từ format cũ sang format mới.
+    
+    Args:
+        request: StandardizeAddressRequest chứa:
+            - address: Địa chỉ cần chuẩn hóa (format: "số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố")
+            - convert_mode: Chế độ convert (mặc định: "CONVERT_2025")
+            - short_name: Sử dụng tên ngắn hay đầy đủ (mặc định: True)
+        
+    Returns:
+        StandardizeAddressResponse với địa chỉ đã được chuẩn hóa
+    """
+    try:
+        if not request.address or not request.address.strip():
+            return StandardizeAddressResponse(
+                success=False,
+                original_address=request.address,
+                standardized_address=None,
+                province=None,
+                district=None,
+                ward=None,
+                street=None,
+                error="Địa chỉ không được để trống"
+            )
+        
+        # Convert địa chỉ từ format cũ (63 tỉnh) sang format mới (34 tỉnh)
+        try:
+            # Sử dụng convert_address để chuyển đổi từ format cũ sang mới
+            converted_address = convert_address(request.address)
+        except Exception as e:
+            return StandardizeAddressResponse(
+                success=False,
+                original_address=request.address,
+                standardized_address=None,
+                province=None,
+                district=None,
+                ward=None,
+                street=None,
+                error=f"Lỗi khi convert địa chỉ: {str(e)}"
+            )
+        
+        # Extract các thành phần
+        province = getattr(converted_address, 'province', None)
+        district = getattr(converted_address, 'district', None)
+        ward = getattr(converted_address, 'ward', None)
+        street = getattr(converted_address, 'street', None)
+        
+        # Sử dụng short_name nếu được yêu cầu
+        if request.short_name:
+            province = getattr(converted_address, 'short_province', province)
+            district = getattr(converted_address, 'short_district', district) if district else None
+            ward = getattr(converted_address, 'short_ward', ward)
+        
+        # Tạo địa chỉ chuẩn hóa đẹp
+        address_parts = []
+        if street:
+            address_parts.append(street)
+        if ward:
+            address_parts.append(ward)
+        if district:
+            address_parts.append(district)
+        if province:
+            address_parts.append(province)
+        
+        standardized_address_str = ", ".join(address_parts) if address_parts else None
+        
+        return StandardizeAddressResponse(
+            success=True,
+            original_address=request.address,
+            standardized_address=standardized_address_str,
+            province=province,
+            district=district,
+            ward=ward,
+            street=street
+        )
+    
+    except Exception as e:
+        return StandardizeAddressResponse(
+            success=False,
+            original_address=request.address if request else "",
+            standardized_address=None,
+            province=None,
+            district=None,
+            ward=None,
+            street=None,
+            error=f"Lỗi server: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
