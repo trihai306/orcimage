@@ -1,0 +1,31 @@
+{
+  "description": "Demo request cho API OCR - Lưu ý: API này nhận file upload qua form-data, không phải JSON body",
+  "endpoint": "POST http://localhost:8000/ocr",
+  "content_type": "multipart/form-data",
+  "request_example": {
+    "method": "POST",
+    "url": "http://localhost:8000/ocr",
+    "headers": {
+      "Content-Type": "multipart/form-data"
+    },
+    "body": {
+      "file": "path/to/image.jpg"
+    }
+  },
+  "response_success": {
+    "success": true,
+    "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\nCĂN CƯỚC CÔNG DÂN\nSố / No.: 027201011670\nHọ và tên / Full name: NGUYỄN CHÍ HẢI\nNgày sinh / Date of birth: 27/05/2001\nGiới tính / Sex: Nam\nQuốc tịch / Nationality: Việt Nam\nQuê quán / Place of origin: Đông Tiến, Yên Phong, Bắc Ninh\nNơi thường trú / Place of residence: Mẫn Xá, Long Châu, Yên Phong, Bắc Ninh\nCó giá trị đến / Date of expiry: 27/05/2026",
+    "language": "vi",
+    "error": null
+  },
+  "response_error": {
+    "success": false,
+    "text": "",
+    "language": "vi",
+    "error": "Không tìm thấy text trong ảnh"
+  },
+  "curl_example": "curl -X POST \"http://localhost:8000/ocr\" -F \"file=@image.jpg\"",
+  "python_example": "Xem file demo_ocr.py",
+  "javascript_example": "Xem file demo_ocr.js"
+}
+
